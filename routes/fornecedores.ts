@@ -4,19 +4,12 @@ import { prisma } from "../db";
 const router = Router();
 
 /* ======================================================
-    1) LISTAR FORNECEDORES POR FILIAL
-    GET /api/fornecedores?filialId=xxxx
+   1) LISTAR FORNECEDORES
+   GET /api/fornecedores
 ====================================================== */
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
-    const { filialId } = req.query;
-
-    if (!filialId) {
-      return res.status(400).json({ error: "filialId é obrigatório" });
-    }
-
     const fornecedores = await prisma.fornecedor.findMany({
-      where: { },
       orderBy: { nome: "asc" },
     });
 
@@ -28,21 +21,17 @@ router.get("/", async (req, res) => {
 });
 
 /* ======================================================
-    2) CRIAR FORNECEDOR
-    POST /api/fornecedores
+   2) CRIAR FORNECEDOR
+   POST /api/fornecedores
 ====================================================== */
 router.post("/", async (req, res) => {
   try {
     const { nome, cnpj, ativo } = req.body;
 
     if (!nome || !cnpj) {
-      return res.status(400).json({ error: "Nome e CNPJ são obrigatórios" });
-    }
-
-    const existente = await prisma.fornecedor.findUnique({ where: { cnpj } });
-
-    if (existente) {
-      return res.status(400).json({ error: "CNPJ já cadastrado" });
+      return res.status(400).json({
+        error: "Nome e CNPJ são obrigatórios",
+      });
     }
 
     const fornecedor = await prisma.fornecedor.create({
@@ -53,37 +42,60 @@ router.post("/", async (req, res) => {
       },
     });
 
-    res.json(fornecedor);
-  } catch (error) {
+    res.status(201).json(fornecedor);
+  } catch (error: any) {
+    // CNPJ duplicado (constraint do banco)
+    if (error.code === "P2002") {
+      return res.status(409).json({
+        error: "CNPJ já cadastrado",
+      });
+    }
+
     console.error("Erro ao criar fornecedor:", error);
     res.status(500).json({ error: "Erro ao criar fornecedor" });
   }
 });
 
 /* ======================================================
-    3) ATUALIZAR FORNECEDOR
-    PATCH /api/fornecedores/:id
+   3) ATUALIZAR FORNECEDOR
+   PATCH /api/fornecedores/:id
 ====================================================== */
 router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const dados = req.body;
+    const { nome, cnpj, ativo } = req.body;
 
     const fornecedor = await prisma.fornecedor.update({
       where: { id },
-      data: dados,
+      data: {
+        nome,
+        cnpj,
+        ativo,
+      },
     });
 
     res.json(fornecedor);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return res.status(404).json({
+        error: "Fornecedor não encontrado",
+      });
+    }
+
+    if (error.code === "P2002") {
+      return res.status(409).json({
+        error: "CNPJ já cadastrado",
+      });
+    }
+
     console.error("Erro ao atualizar fornecedor:", error);
     res.status(500).json({ error: "Erro ao atualizar fornecedor" });
   }
 });
 
 /* ======================================================
-    4) REMOVER FORNECEDOR
-    DELETE /api/fornecedores/:id
+   4) REMOVER FORNECEDOR
+   DELETE /api/fornecedores/:id
 ====================================================== */
 router.delete("/:id", async (req, res) => {
   try {
@@ -93,8 +105,14 @@ router.delete("/:id", async (req, res) => {
       where: { id },
     });
 
-    res.json({ ok: true });
-  } catch (error) {
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return res.status(404).json({
+        error: "Fornecedor não encontrado",
+      });
+    }
+
     console.error("Erro ao remover fornecedor:", error);
     res.status(500).json({ error: "Erro ao remover fornecedor" });
   }

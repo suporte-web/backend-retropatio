@@ -38,6 +38,7 @@ model Filial {
   vagas      Vaga[]
   Veiculo    Veiculo[]
   visitantes Visitante[]
+  fornecedores Fornecedor[]
 
   @@map("Filial")
 }
@@ -140,6 +141,8 @@ model Fornecedor {
 
   @@map("Fornecedor")
 }
+
+
 
 model Veiculo {
   id             String  @id @default(uuid())
