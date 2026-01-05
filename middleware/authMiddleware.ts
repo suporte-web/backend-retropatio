@@ -1,25 +1,42 @@
-import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "segredo_teste_super_seguro";
+interface JwtPayload {
+  id: number;
+  role: string;
+}
 
-export function authMiddleware(req: any, res: Response, next: NextFunction) {
+export function authMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
     return res.status(401).json({ error: "Token não informado" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const [, token] = authHeader.split(" ");
+
+  if (!token) {
+    return res.status(401).json({ error: "Token inválido" });
+  }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET as string
+    ) as JwtPayload;
 
-    // 🔥 Agora TODAS as rotas vão ter req.user
-    req.user = decoded;
+    // 👇 AQUI está o ponto-chave
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+    };
 
     next();
-  } catch (err) {
-    return res.status(401).json({ error: "Token inválido ou expirado" });
+  } catch (error) {
+    return res.status(401).json({ error: "Token inválido" });
   }
 }

@@ -228,34 +228,41 @@ router.post("/", async (req, res) => {
   try {
     const data = req.body;
 
-    if (!data.filialId || !data.vagaId || !data.placaCavalo || !data.motorista) {
+    const vagaIdRaw = data.vagaId ?? data.vaga?.id;
+    const vagaId = Number(vagaIdRaw);
+
+    if (!data.filialId || !data.placaCavalo || !data.motorista) {
       return res.status(400).json({
-        error: "filialId, vagaId, placaCavalo e motorista são obrigatórios",
+        error: "filialId, placaCavalo e motorista são obrigatórios",
       });
     }
 
+    if (!Number.isInteger(vagaId) || vagaId <= 0) {
+      return res.status(400).json({ error: "vagaId inválido" });
+    }
+
     const vaga = await prisma.vaga.findUnique({
-      where: { id: Number(data.vagaId) },
+      where: { id: vagaId },
     });
 
     if (!vaga) {
       return res.status(400).json({ error: "Vaga não encontrada" });
     }
 
-    let veiculo = await prisma.veiculo.findUnique({
-      where: { placa: data.placaCavalo },
-    });
+    let veiculo = await prisma.veiculo.findFirst({
+    where: { placaCavalo: data.placaCavalo },
+  });
 
     if (!veiculo) {
-      veiculo = await prisma.veiculo.create({
-        data: {
-          id: crypto.randomUUID(),
-          placa: data.placaCavalo,
-          motorista: data.motorista,
-          tipo: data.tipo ?? "cavalo",
-          status: "ativo",
-          filialId: data.filialId,
-          vagaId: Number(data.vagaId),
+   veiculo = await prisma.veiculo.create({
+    data: {
+    placaCavalo: data.placaCavalo,
+    motorista: data.motorista,
+    filialId: data.filialId,
+    cliente: data.cliente ?? null,
+    transportadora: data.transportadora ?? null,
+    cpfMotorista: data.cpfMotorista ?? null,
+
         },
       });
     }
@@ -263,7 +270,7 @@ router.post("/", async (req, res) => {
     const entrada = await prisma.entrada.create({
       data: {
         filialId: data.filialId,
-        vagaId: Number(data.vagaId),
+        vagaId,
         veiculoId: veiculo.id,
 
         placaCavalo: data.placaCavalo,
@@ -289,7 +296,7 @@ router.post("/", async (req, res) => {
     });
 
     await prisma.vaga.update({
-      where: { id: Number(data.vagaId) },
+      where: { id: vagaId },
       data: { status: "ocupada" },
     });
 
@@ -304,5 +311,48 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ error: "Erro ao registrar veículo" });
   }
 });
+
+
+
+/* ======================================================
+   FINALIZAR ENTRADA (SOFT DELETE)
+   DELETE /api/veiculos/:id
+====================================================== */
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id); // ← ID DA ENTRADA
+
+    const entrada = await prisma.entrada.update({
+      where: { id },
+      data: {
+        dataSaida: new Date(),
+        status: "finalizado",
+      },
+    });
+
+    // libera vaga se existir
+    if (entrada.vagaId) {
+      await prisma.vaga.update({
+        where: { id: entrada.vagaId },
+        data: { status: "livre" },
+      });
+    }
+
+    return res.json({
+      sucesso: true,
+      mensagem: "Entrada finalizada com sucesso",
+      entrada,
+    });
+  } catch (error) {
+    console.error("Erro ao finalizar entrada:", error);
+    return res.status(500).json({
+      error: "Erro ao remover veículo do pátio",
+    });
+  }
+});
+
+
+
+
 
 export default router;

@@ -12,6 +12,8 @@ import userFiliaisRouter from "./userFiliais";
 import notificacoesRouter from "./notificacoes";
 import auditLogsRouter from "./auditLogs";
 import { prisma } from "../db";
+import chamadasRouter from "./chamadas";
+
 
 export async function registerRoutes(app: Express) {
   // ============================
@@ -71,6 +73,14 @@ export async function registerRoutes(app: Express) {
   // AUDITORIA
   // ============================
   app.use("/api/audit-logs", auditLogsRouter);
+
+  //==============================
+  // CHAMADAS
+  //==============================
+
+  app.use("/api/chamadas", chamadasRouter);
+
+
 
   // =====================================================
   // 🔹 IDs de filiais que o usuário pode visualizar

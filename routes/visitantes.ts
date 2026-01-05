@@ -238,4 +238,55 @@ router.patch("/:id/saida", async (req, res) => {
   }
 });
 
+/* ======================================================
+   EXPORTAR VISITANTES (CSV)
+   GET /api/visitantes/export?filialId=xxxx
+====================================================== */
+router.get("/export", async (req, res) => {
+  try {
+    const { filialId } = req.query;
+
+    if (!filialId) {
+      return res.status(400).json({ error: "filialId é obrigatório" });
+    }
+
+    const visitantes = await prisma.visitante.findMany({
+      where: {
+        filialId: String(filialId),
+        OR: [{ status: "saiu" }, { dataSaida: { not: null } }],
+      },
+      orderBy: { dataSaida: "desc" },
+    });
+
+    const csv = [
+      "Nome,CPF,Empresa,Entrada,Saída",
+      ...visitantes.map((v) =>
+        [
+          v.nome,
+          v.cpf,
+          v.empresa ?? "",
+          v.dataEntrada
+            ? new Date(v.dataEntrada).toLocaleString("pt-BR")
+            : "",
+          v.dataSaida
+            ? new Date(v.dataSaida).toLocaleString("pt-BR")
+            : "",
+        ].join(",")
+      ),
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=visitantes_historico.csv"
+    );
+
+    res.send(csv);
+  } catch (error) {
+    console.error("Erro ao exportar visitantes:", error);
+    res.status(500).json({ error: "Erro ao exportar visitantes" });
+  }
+});
+
+
 export default router;

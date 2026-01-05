@@ -253,4 +253,44 @@ router.patch("/:id/reabrir", async (req, res) => {
   }
 });
 
+/* ======================================================
+   7) HISTÓRICO DE ENTRADAS POR PERÍODO
+   GET /api/entrada/historico/periodo
+====================================================== */
+router.get("/historico/periodo", async (req, res) => {
+  try {
+    const { filialId, inicio, fim } = req.query;
+
+    if (!filialId || !inicio || !fim) {
+      return res.status(400).json({
+        error: "filialId, inicio e fim são obrigatórios"
+      });
+    }
+
+    const historico = await prisma.entrada.findMany({
+      where: {
+        filialId: String(filialId),
+        dataEntrada: {
+          gte: new Date(`${inicio}T00:00:00`),
+          lte: new Date(`${fim}T23:59:59`)
+        }
+      },
+      include: {
+        vaga: true,
+        filial: true
+      },
+      orderBy: {
+        dataEntrada: "desc"
+      }
+    });
+
+    res.json(historico);
+
+  } catch (error) {
+    console.error("Erro ao buscar histórico:", error);
+    res.status(500).json({ error: "Erro ao buscar histórico" });
+  }
+});
+
+
 export default router;
